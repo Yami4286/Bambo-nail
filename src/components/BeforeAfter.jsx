@@ -13,9 +13,9 @@ export default function BeforeAfter() {
       </Reveal>
       <Reveal delay={0.1}>
         <div className="compare" style={{ '--position': `${value}%` }}>
-          <img src={compareImages.after} alt="After: hand with a freshly manicured blush-pink polish resting on a soft white surface" />
+          <img src={compareImages.after} alt="After: the same hand with a freshly applied blush-pink manicure" />
           <div className="compare__before">
-            <img src={compareImages.before} alt="Before: natural, unpolished nails on a clean white table" />
+            <img src={compareImages.before} alt="Before: the same hand with natural, unpolished nails and a delicate ring" />
           </div>
           <span className="compare__label compare__label--before">Before</span>
           <span className="compare__label compare__label--after">After</span>

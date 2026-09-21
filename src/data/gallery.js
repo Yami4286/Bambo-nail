@@ -4,8 +4,8 @@ export const heroImage = image('1659391542239-9648f307c0b1', 1800)
 export const studioImage = image('1610992015732-2449b76344bc', 900)
 export const detailImage = image('1762373349045-c2decd4ec3f3', 1200)
 export const compareImages = {
-  before: image('1596887772390-2648c0155278', 1200),
-  after: image('1610992015762-45dca7fa3a85', 1200),
+  before: image('1688583417770-ff6cc18071dc', 1200),
+  after: image('1688583417757-9060cba25399', 1200),
 }
 
 export const gallery = [
