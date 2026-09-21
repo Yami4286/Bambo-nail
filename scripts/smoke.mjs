@@ -118,6 +118,30 @@ check('reveal plays in view', Number(replay.shown) > 0.9, `opacity=${replay.show
 check('reveal resets out of view (replayable)', Number(replay.hidden) < 0.25, `opacity=${replay.hidden}`)
 check('reveal replays on re-entry', Number(replay.shown2) > 0.9, `opacity=${replay.shown2}`)
 
+// transformation slider: new image pair + interaction
+const cmp = JSON.parse(await evalPage(`(async () => {
+  window.scrollTo(0, document.querySelector('.comparison').offsetTop); await new Promise(r => setTimeout(r, 900))
+  const imgs = [...document.querySelectorAll('.compare img')]
+  const out = { after: imgs[0]?.src || '', before: imgs[1]?.src || '' }
+  out.loaded = await Promise.all(imgs.map(i => i.complete ? Promise.resolve(i.naturalWidth > 0) : new Promise(res => { i.onload = () => res(true); i.onerror = () => res(false) })))
+  const box = document.querySelector('.compare')
+  const input = document.querySelector('.compare input')
+  const setVal = v => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, v); input.dispatchEvent(new Event('input', { bubbles: true })) }
+  setVal(20)
+  await new Promise(r => setTimeout(r, 200))
+  out.pos20 = box.style.getPropertyValue('--position')
+  setVal(80)
+  await new Promise(r => setTimeout(r, 200))
+  out.pos80 = box.style.getPropertyValue('--position')
+  out.labels = [...document.querySelectorAll('.compare__label')].map(l => l.textContent)
+  return JSON.stringify(out)
+})()`))
+check('compare uses new before image (natural nails)', cmp.before.includes('1596887772390'), cmp.before.slice(-45))
+check('compare uses new after image (blush manicure)', cmp.after.includes('1610992015762'), cmp.after.slice(-45))
+check('compare images all load', cmp.loaded.every(Boolean))
+check('compare slider responds to input', cmp.pos20 === '20%' && cmp.pos80 === '80%', `${cmp.pos20} -> ${cmp.pos80}`)
+check('compare keeps BEFORE/AFTER labels', cmp.labels.join('|') === 'Before|After')
+
 // gallery filter + lightbox
 const g = JSON.parse(await evalPage(`(async () => {
   const out = {}
@@ -148,6 +172,33 @@ check('lightbox locks page scroll', g.scrollLocked)
 check('lightbox next/prev work', g.nextWorks)
 check('lightbox closes on Escape', g.closesOnEscape)
 check('scroll restored after close', g.scrollUnlocked)
+
+// kind words: name/role/counter/buttons must never overlap at any width
+const overlapFailures = []
+for (const width of [320, 375, 390, 430, 768, 1440]) {
+  await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 800 })
+  await sleep(500)
+  const res = JSON.parse(await evalPage(`(async () => {
+    window.scrollTo(0, document.querySelector('#reviews').offsetTop); await new Promise(r => setTimeout(r, 800))
+    const name = document.querySelector('.reviews__name')
+    const role = document.querySelector('.reviews__role')
+    const counter = document.querySelector('.review-controls span')
+    const btns = [...document.querySelectorAll('.review-controls button')]
+    if (!name || !role || !counter || btns.length < 2) return JSON.stringify({ missing: true })
+    const r = el => { const b = el.getBoundingClientRect(); return { l: b.left, rt: b.right, t: b.top, b: b.bottom } }
+    const boxes = { counter: r(counter), name: r(name), next: r(btns[1]), prev: r(btns[0]), role: r(role) }
+    const hit = (a, b) => a.l < b.rt - 0.5 && b.l < a.rt - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5
+    const overlaps = []
+    const keys = Object.keys(boxes)
+    for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) if (hit(boxes[keys[i]], boxes[keys[j]])) overlaps.push(keys[i] + '+' + keys[j])
+    const visible = name.getBoundingClientRect().height > 0 && counter.getBoundingClientRect().height > 0
+    return JSON.stringify({ overlaps, visible })
+  })()`))
+  if (res.missing || !res.visible || res.overlaps.length) overlapFailures.push(`${width}: ${res.missing ? 'missing elements' : res.overlaps.join(',') || 'invisible'}`)
+  console.log(`  width ${width}: ${res.missing ? 'MISSING' : res.overlaps.length ? 'OVERLAP ' + res.overlaps.join(',') : 'ok'}`)
+}
+await send('Emulation.clearDeviceMetricsOverride')
+check('reviews: name/role/counter/buttons never overlap at any width', overlapFailures.length === 0, overlapFailures.join(' | '))
 
 // booking form
 const b = JSON.parse(await evalPage(`(async () => {

@@ -34,7 +34,7 @@ export default function Testimonials() {
             >
               <div className="stars" aria-label={`${t.rating} out of 5 stars`}>{Array.from({ length: t.rating }, (_, i) => <Star key={i} />)}</div>
               <blockquote>“{t.quote}”</blockquote>
-              <p>{t.name} <span>— Guest review</span></p>
+              <p className="reviews__meta"><span className="reviews__name">{t.name}</span><span className="reviews__role">Guest review</span></p>
             </motion.div>
           </AnimatePresence>
           <div className="review-controls">
