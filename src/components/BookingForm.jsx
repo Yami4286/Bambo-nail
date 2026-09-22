@@ -46,9 +46,9 @@ export default function BookingForm() {
         <p className="eyebrow">Request prepared</p>
         <h2>Thanks — your appointment request is ready.</h2>
         <p>
-          This form does not store or send appointments — it simply prepares your request.
-          Get in touch directly and mention {values.name ? `your name (${values.name})` : 'your details'} to confirm
-          {values.service ? ` your ${services.find(s => s.slug === values.service)?.name}` : ' your preferred time'}.
+          This form does not store or send appointments. Get in touch directly to confirm
+          {values.service ? ` your ${services.find(s => s.slug === values.service)?.name}` : ' your preferred time'}
+          {values.date ? ` for ${values.date}` : ''}.
         </p>
         <div className="booking__actions">
           <a className="button" href={business.phoneLink}>Call Bambo Nails <Arrow /></a>
@@ -60,9 +60,9 @@ export default function BookingForm() {
 
   return (
     <form className="booking__form" onSubmit={submit} noValidate>
-      <label>Name<input name="name" value={values.name} onChange={setField} autoComplete="name" /></label>
-      <label>Phone<input name="phone" type="tel" value={values.phone} onChange={setField} autoComplete="tel" /></label>
-      <label>Email<input name="email" type="email" value={values.email} onChange={setField} autoComplete="email" /></label>
+      <label>Name<input name="name" value={values.name} onChange={setField} autoComplete="name" placeholder="Your name" /></label>
+      <label>Phone<input name="phone" type="tel" value={values.phone} onChange={setField} autoComplete="tel" placeholder="Your phone number" /></label>
+      <label>Email<input name="email" type="email" value={values.email} onChange={setField} autoComplete="email" placeholder="you@example.com" /></label>
       <label>
         Service
         <select name="service" value={values.service} onChange={setField}>
@@ -80,10 +80,10 @@ export default function BookingForm() {
           <option value="evening">Evening</option>
         </select>
       </label>
-      <label className="booking__full">Additional notes<textarea name="notes" rows="3" value={values.notes} onChange={setField} /></label>
+      <label className="booking__full">Additional notes<textarea name="notes" rows="4" value={values.notes} onChange={setField} placeholder="Anything we should know — inspirations, allergies, occasions…" /></label>
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="button booking__full" type="submit">Prepare my request <Arrow /></button>
-      <small className="booking__full">Frontend demonstration only — no appointment information is stored.</small>
+      <small className="booking__full">This form prepares your request on your device — nothing is sent or stored automatically.</small>
     </form>
   )
 }

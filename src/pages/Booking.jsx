@@ -5,7 +5,12 @@ import PageTransition from '../components/PageTransition'
 import PageHero from '../components/PageHero'
 import BookingForm from '../components/BookingForm'
 import { Reveal } from '../components/Motion'
+import { bookingImage } from '../data/gallery'
 
+/**
+ * Booking page: request form plus a calm aside with contact actions,
+ * studio hours and supporting imagery. Entirely frontend-only.
+ */
 export default function Booking() {
   usePageMeta(
     'Book an Appointment | Bambo Nails',
@@ -26,10 +31,16 @@ export default function Booking() {
 
       <section className="booking-page section container" aria-label="Booking request">
         <Reveal className="booking-page__aside">
+          <img
+            className="booking-page__image"
+            loading="lazy"
+            src={bookingImage}
+            alt="Freshly manicured hands resting during a calm studio appointment"
+          />
           <p className="eyebrow">Good to know</p>
           <p>
-            This form prepares your request on your device only — nothing is sent or stored. To confirm your
-            appointment, call the studio, email us or send a message on WhatsApp.
+            This form prepares your request on your device — nothing is sent or stored automatically. To confirm
+            your appointment, call the studio, email us or send a message on WhatsApp.
           </p>
           <div className="booking-page__contact">
             <a className="button" href={business.phoneLink}>Call the studio <Arrow /></a>

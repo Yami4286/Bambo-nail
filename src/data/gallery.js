@@ -2,12 +2,13 @@ const image = (id, width = 1200) => `https://images.unsplash.com/photo-${id}?aut
 
 export const heroImage = image('1659391542239-9648f307c0b1', 1800)
 export const studioImage = image('1610992015732-2449b76344bc', 900)
-export const detailImage = image('1762373349045-c2decd4ec3f3', 1200)
+export const aboutImage = image('1632345031435-8727f6897d53', 1400)
+export const craftImage = image('1522337660859-02fbefca4702', 1400)
+export const bookingImage = image('1607779097040-26e80aa78e66', 900)
 export const compareImages = {
   before: image('1688583417770-ff6cc18071dc', 1200),
   after: image('1688583417757-9060cba25399', 1200),
 }
-export const aboutImage = image('1688583417757-9060cba25399', 1400)
 
 export const gallery = [
   { id: 1, category: 'Minimal', title: 'Barely there', alt: 'Glossy neutral manicure in soft studio light', src: image('1659391542239-9648f307c0b1'), serviceTag: 'classic-manicure' },

@@ -198,15 +198,33 @@ check('contact: renders info + map link', await evalPage("!!document.querySelect
 await go('/no-such-page')
 check('404: branded page with back-home link', await evalPage("!!document.querySelector('.not-found') && document.querySelector('.not-found a.button')?.getAttribute('href') === '/'"))
 
-// footer present with routing links on every page
+// footer structure + no stale scroll on fresh load, on every page
 for (const path of ['/', '/about', '/services', '/gallery', '/reviews', '/booking', '/contact']) {
   await go(path, 1800)
-  const footerOk = await evalPage(`(() => {
-    const links = [...document.querySelectorAll('.footer a')]
-    const has404Href = links.some(a => a.getAttribute('href') === '/404')
-    return links.length >= 10 && !has404Href
-  })()`)
-  check(`footer: routing links ok on ${path}`, footerOk)
+  const page = JSON.parse(await evalPage(`(() => {
+    const labels = [...document.querySelectorAll('.footer__label')].map(el => el.textContent)
+    const footerLinks = document.querySelectorAll('.footer a').length
+    const usesHeaderNav = !!document.querySelector('.footer .nav__links, .footer .nav__toggle')
+    const contactImgs = [...document.images].length
+    return JSON.stringify({ labels, footerLinks, usesHeaderNav, contactImgs })
+  })()`))
+  check(`${path}: loads at top (no stale scroll under navbar)`, await evalPage('window.scrollY') === 0)
+  check(`${path}: footer labelled groups (Explore/Visit/Contact/Follow)`, JSON.stringify(page.labels) === JSON.stringify(['Explore', 'Visit', 'Contact', 'Follow']), JSON.stringify(page.labels))
+  check(`${path}: footer has own structure + enough links`, page.footerLinks >= 10 && !page.usesHeaderNav)
+  if (path === '/contact') {
+    check('contact: no duplicated <img> stacking', page.contactImgs === 0, `${page.contactImgs} imgs`)
+    const mapCard = await evalPage("getComputedStyle(document.querySelector('.map-card')).backgroundImage.includes('1610992015732')")
+    check('contact: map-card keeps studio background', mapCard)
+  }
+  if (path === '/booking') {
+    check('booking: aside image present', await evalPage("!!document.querySelector('.booking-page__image')"))
+    const control = await evalPage(`(() => {
+      const el = document.querySelector('[name=service]')
+      const s = getComputedStyle(el)
+      return s.appearance === 'none' || s.webkitAppearance === 'none'
+    })()`)
+    check('booking: custom select styling applied', control)
+  }
 }
 
 // scroll progress reacts to scrolling

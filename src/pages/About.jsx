@@ -5,7 +5,7 @@ import PageTransition from '../components/PageTransition'
 import PageHero from '../components/PageHero'
 import Philosophy from '../components/Philosophy'
 import { Reveal } from '../components/Motion'
-import { aboutImage, detailImage } from '../data/gallery'
+import { aboutImage, craftImage } from '../data/gallery'
 
 const philosophyNotes = [
   ['01', 'Detail', 'Every shape, edge and finish receives attention. Nothing leaves the studio half-considered.'],
@@ -33,7 +33,7 @@ export default function About() {
 
       <section className="about-story section container" aria-labelledby="about-story-title">
         <Reveal className="about-story__image">
-          <img loading="lazy" src={aboutImage} alt="Manicured hands at rest in a calm, softly lit studio" />
+          <img loading="lazy" src={aboutImage} alt="Nail technician preparing her tools in the Bambo Nails studio" />
         </Reveal>
         <Reveal className="about-story__body" delay={0.1}>
           <p className="eyebrow">Our story</p>
@@ -62,7 +62,7 @@ export default function About() {
 
       <section className="about-editorial section" aria-label="Studio imagery">
         <Reveal className="about-editorial__image">
-          <img loading="lazy" src={detailImage} alt="French manicured hand gently holding a small white flower" />
+          <img loading="lazy" src={craftImage} alt="A manicure in progress in the calm Bambo Nails studio" />
         </Reveal>
       </section>
 

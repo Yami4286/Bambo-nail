@@ -1,11 +1,14 @@
 import { business } from '../data/business'
-import { studioImage } from '../data/gallery'
 import { Arrow } from '../components/Icons'
 import usePageMeta from '../hooks/usePageMeta'
 import PageTransition from '../components/PageTransition'
 import PageHero from '../components/PageHero'
 import { Reveal } from '../components/Motion'
 
+/**
+ * Contact page: information column beside a single deliberate studio
+ * image. All contact actions are labelled links (tel / mailto / maps).
+ */
 export default function Contact() {
   usePageMeta(
     'Contact Bambo Nails',
@@ -40,7 +43,7 @@ export default function Contact() {
           </div>
         </Reveal>
 
-        <Reveal className="contact-page__location" delay={0.1}>
+        <Reveal className="contact-page__media" delay={0.1}>
           <a
             href={`https://maps.google.com/?q=${encodeURIComponent(business.address)}`}
             className="map-card"
@@ -49,7 +52,6 @@ export default function Contact() {
           >
             <span>Open in Google Maps <Arrow /></span>
           </a>
-          <img className="contact-page__image" loading="lazy" src={studioImage} alt="Glossy manicured hands resting on soft white linen in the studio" />
         </Reveal>
       </section>
     </PageTransition>
