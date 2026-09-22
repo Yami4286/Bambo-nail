@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { studioImage } from '../data/gallery'
 import { Arrow } from './Icons'
 import { Reveal } from './Motion'
@@ -12,7 +13,7 @@ export default function Intro() {
       <Reveal className="intro__body" delay={0.14}>
         <div className="intro__image"><img loading="lazy" src={studioImage} alt="Glossy manicured hands resting on soft white linen" /></div>
         <p>At Bambo, we see every appointment as a pause in your day. A considered space for meticulous care, effortless polish and a style that feels quietly yours.</p>
-        <a href="#contact" className="text-link">Discover the studio <Arrow /></a>
+        <Link to="/about" className="text-link">Discover Bambo Nails <Arrow /></Link>
       </Reveal>
     </section>
   )

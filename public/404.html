@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Static-host fallback: forward deep links to the SPA entry point,
+      // preserving the path + query for the client-side router.
+      sessionStorage.setItem('bambo-redirect', location.pathname + location.search)
+      location.replace('/')
+    </script>
+    <link rel="canonical" href="https://www.bambonails.com/" />
+    <title>Bambo Nails</title>
+  </head>
+  <body></body>
+</html>

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Arrow } from './Icons'
 import { heroImage } from '../data/gallery'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -26,11 +27,11 @@ export default function Hero() {
         <motion.h1 variants={item} transition={{ duration: 0.8, ease: [0.22, 0.61, 0.36, 1] }} id="hero-title">Beautiful nails,<br /><em>thoughtfully done.</em></motion.h1>
         <motion.p variants={item} transition={{ duration: 0.65 }} className="hero__copy">Modern manicures, detailed nail artistry, and a little time dedicated entirely to you.</motion.p>
         <motion.div variants={item} transition={{ duration: 0.65 }} className="hero__actions">
-          <a className="button" href="#booking">Book an appointment <Arrow /></a>
-          <a className="text-link text-link--light" href="#services">Explore services <Arrow /></a>
+          <Link className="button" to="/booking">Book an appointment <Arrow /></Link>
+          <Link className="text-link text-link--light" to="/services">Explore services <Arrow /></Link>
         </motion.div>
       </motion.div>
-      <a className="scroll-cue" href="#about" aria-label="Scroll to about Bambo Nails"><span /> Scroll to discover</a>
+      <Link className="scroll-cue" to="/about" aria-label="Discover Bambo Nails"><span /> Discover Bambo</Link>
     </section>
   )
 }

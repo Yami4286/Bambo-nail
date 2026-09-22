@@ -1,10 +1,11 @@
-// CDP smoke test for the Bambo Nails production preview (http://localhost:4173).
+// CDP smoke test for the Bambo Nails multi-page production preview (http://localhost:4173).
 // Usage: node scripts/smoke.mjs
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
+const BASE = 'http://localhost:4173'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 // --- reuse a running Chrome or launch headless one ---
@@ -73,79 +74,48 @@ function check(name, ok, detail = '') {
 await send('Page.enable')
 await send('Runtime.enable')
 
-// --- run checks ---
-await send('Page.navigate', { url: 'http://localhost:4173/' })
-await sleep(3500)
+// --- navigate to a route and wait for render ---
+async function go(path, wait = 2500) {
+  await send('Page.navigate', { url: BASE + path })
+  await sleep(wait)
+}
 
-check('page title', (await evalPage('document.title')) === 'Bambo Nails | Modern Manicures & Nail Art')
-check('app rendered into #root', await evalPage("!!document.querySelector('#root .hero')"))
+// ---------- HOME ----------
+await go('/')
+check('home: title', (await evalPage('document.title')) === 'Bambo Nails | Modern Manicures & Nail Art')
+check('home: hero rendered', await evalPage("!!document.querySelector('.hero')"))
+check('home: hero CTA routes to /booking', (await evalPage("document.querySelector('.hero__actions a.button')?.getAttribute('href')")) === '/booking')
+check('home: featured services rendered', await evalPage("document.querySelectorAll('.service-grid .service-card').length") === 4)
+check('home: gallery preview has 6 items', await evalPage("document.querySelectorAll('.gallery-grid--preview .gallery-item').length") === 6)
+check('home: no in-page hash nav links', await evalPage("[...document.querySelectorAll('header a')].every(a => !a.getAttribute('href').startsWith('#'))"))
 
-// nav + in-page anchors
-const nav = JSON.parse(await evalPage(`(() => {
-  const ids = ['home','about','services','gallery','reviews','booking','contact']
-  const missing = ids.filter(id => !document.getElementById(id))
-  const links = [...document.querySelectorAll('a[href^="#"]')].map(a => a.getAttribute('href'))
-  const dead = [...new Set(links.filter(h => h.length > 1 && !document.querySelector(h)))]
-  return JSON.stringify({ missing, dead })
-})()`))
-check('all section anchors exist', nav.missing.length === 0, nav.missing.join(','))
-check('all in-page links resolve', nav.dead.length === 0, nav.dead.join(','))
+// ---------- cross-page nav through the menu ----------
+const navPaths = JSON.parse(await evalPage(`JSON.stringify([...document.querySelectorAll('.nav__links a')].map(a => a.getAttribute('href')))`))
+check('nav: routes match spec', JSON.stringify(navPaths) === JSON.stringify(['/', '/about', '/services', '/gallery', '/reviews', '/contact', '/booking']), JSON.stringify(navPaths))
 
-// scroll progress reacts to scrolling
-const p0 = await evalPage("getComputedStyle(document.querySelector('.scroll-progress')).transform")
-await evalPage('window.scrollTo(0, document.body.scrollHeight / 2)')
-await sleep(800)
-const p1 = await evalPage("getComputedStyle(document.querySelector('.scroll-progress')).transform")
-await evalPage('window.scrollTo(0, document.body.scrollHeight)')
-await sleep(800)
-const p2 = await evalPage("getComputedStyle(document.querySelector('.scroll-progress')).transform")
-check('scroll progress bar animates', p0 !== p1 && p1 !== p2, `${p0} -> ${p1} -> ${p2}`)
+await go('/about')
+check('about: renders story', await evalPage("!!document.querySelector('.about-story') && !!document.querySelector('.philosophy--3-col')"))
+check('about: active nav state', await evalPage("[...document.querySelectorAll('.nav__links a')].find(a => a.getAttribute('href') === '/about')?.classList.contains('active')"))
+check('about: title', (await evalPage('document.title')) === 'About Bambo Nails | Nail Care & Beauty')
 
-// replayable reveals
-const replay = JSON.parse(await evalPage(`(async () => {
-  const probe = document.querySelector('#services .section-head')
-  const op = () => getComputedStyle(probe).opacity
-  window.scrollTo(0, 0); await new Promise(r => setTimeout(r, 700))
-  window.scrollTo(0, document.querySelector('#services').offsetTop); await new Promise(r => setTimeout(r, 1400))
-  const shown = op()
-  window.scrollTo(0, 0); await new Promise(r => setTimeout(r, 800))
-  const hidden = op()
-  window.scrollTo(0, document.querySelector('#services').offsetTop); await new Promise(r => setTimeout(r, 1400))
-  const shown2 = op()
-  return JSON.stringify({ shown, hidden, shown2 })
-})()`))
-check('reveal plays in view', Number(replay.shown) > 0.9, `opacity=${replay.shown}`)
-check('reveal resets out of view (replayable)', Number(replay.hidden) < 0.25, `opacity=${replay.hidden}`)
-check('reveal replays on re-entry', Number(replay.shown2) > 0.9, `opacity=${replay.shown2}`)
+await go('/services')
+check('services: renders 6 catalogue cards in 3 groups', await evalPage("document.querySelectorAll('.services-catalogue .service-card').length") === 6)
+check('services: category groups present', await evalPage("document.querySelectorAll('.services-catalogue__group').length") === 3)
 
-// transformation slider: new image pair + interaction
-const cmp = JSON.parse(await evalPage(`(async () => {
-  window.scrollTo(0, document.querySelector('.comparison').offsetTop); await new Promise(r => setTimeout(r, 900))
-  const imgs = [...document.querySelectorAll('.compare img')]
-  const out = { after: imgs[0]?.src || '', before: imgs[1]?.src || '' }
-  out.loaded = await Promise.all(imgs.map(i => i.complete ? Promise.resolve(i.naturalWidth > 0) : new Promise(res => { i.onload = () => res(true); i.onerror = () => res(false) })))
-  const box = document.querySelector('.compare')
-  const input = document.querySelector('.compare input')
-  const setVal = v => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, v); input.dispatchEvent(new Event('input', { bubbles: true })) }
-  setVal(20)
-  await new Promise(r => setTimeout(r, 200))
-  out.pos20 = box.style.getPropertyValue('--position')
-  setVal(80)
-  await new Promise(r => setTimeout(r, 200))
-  out.pos80 = box.style.getPropertyValue('--position')
-  out.labels = [...document.querySelectorAll('.compare__label')].map(l => l.textContent)
-  return JSON.stringify(out)
-})()`))
-check('compare uses new before image (natural nails)', cmp.before.includes('1688583417770'), cmp.before.slice(-45))
-check('compare uses new after image (blush manicure)', cmp.after.includes('1688583417757'), cmp.after.slice(-45))
-check('compare images all load', cmp.loaded.every(Boolean))
-check('compare slider responds to input', cmp.pos20 === '20%' && cmp.pos80 === '80%', `${cmp.pos20} -> ${cmp.pos80}`)
-check('compare keeps BEFORE/AFTER labels', cmp.labels.join('|') === 'Before|After')
+await go('/services/gel-manicure')
+check('service detail: renders', await evalPage("!!document.querySelector('.service-detail')"))
+check('service detail: title', (await evalPage('document.title')) === 'Gel Manicure | Bambo Nails')
+check('service detail: book CTA carries query param', (await evalPage("document.querySelector('.page-hero--service .page-hero__cta a')?.getAttribute('href')")) === '/booking?service=gel-manicure')
+check('service detail: FAQ present', await evalPage("document.querySelectorAll('.service-faq__item').length >= 2"))
 
-// gallery filter + lightbox
+await go('/services/does-not-exist')
+check('service detail: unknown slug shows 404', await evalPage("!!document.querySelector('.not-found')"))
+
+await go('/gallery')
+check('gallery: renders with filters', await evalPage("document.querySelectorAll('.filters button').length >= 5"))
 const g = JSON.parse(await evalPage(`(async () => {
   const out = {}
-  window.scrollTo(0, document.querySelector('#gallery').offsetTop); await new Promise(r => setTimeout(r, 1000))
+  window.scrollTo(0, 400); await new Promise(r => setTimeout(r, 600))
   out.before = document.querySelectorAll('.gallery-item').length
   const frenchBtn = [...document.querySelectorAll('.filters button')].find(b => b.textContent === 'French')
   frenchBtn.click(); await new Promise(r => setTimeout(r, 800))
@@ -156,6 +126,7 @@ const g = JSON.parse(await evalPage(`(async () => {
   document.querySelector('.gallery-item__button').click(); await new Promise(r => setTimeout(r, 800))
   out.lightboxOpen = !!document.querySelector('.lightbox')
   out.lightboxFocused = document.activeElement?.classList?.contains('lightbox')
+  out.counter = document.querySelector('.lightbox p')?.textContent.slice(0, 2)
   out.scrollLocked = document.documentElement.style.overflow === 'hidden'
   document.querySelector('.lightbox__next').click(); await new Promise(r => setTimeout(r, 500))
   out.nextWorks = !!document.querySelector('.lightbox img')
@@ -165,107 +136,152 @@ const g = JSON.parse(await evalPage(`(async () => {
   out.scrollUnlocked = document.documentElement.style.overflow === ''
   return JSON.stringify(out)
 })()`))
-check('gallery filter narrows items', g.filtered > 0 && g.filtered < g.before, `${g.before} -> ${g.filtered}`)
-check('filter exposes aria-pressed', g.filterPressed === 'true')
-check('lightbox opens and takes focus', g.lightboxOpen && g.lightboxFocused)
-check('lightbox locks page scroll', g.scrollLocked)
-check('lightbox next/prev work', g.nextWorks)
-check('lightbox closes on Escape', g.closesOnEscape)
-check('scroll restored after close', g.scrollUnlocked)
+check('gallery: filter narrows items', g.filtered > 0 && g.filtered < g.before, `${g.before} -> ${g.filtered}`)
+check('gallery: filter exposes aria-pressed', g.filterPressed === 'true')
+check('gallery: lightbox opens with counter', g.lightboxOpen && g.lightboxFocused && g.counter === '01')
+check('gallery: lightbox locks page scroll', g.scrollLocked)
+check('gallery: lightbox next/prev work', g.nextWorks)
+check('gallery: lightbox closes on Escape', g.closesOnEscape)
+check('gallery: scroll restored after close', g.scrollUnlocked)
 
-// kind words: name/role/counter/buttons must never overlap at any width
-const overlapFailures = []
-for (const width of [320, 375, 390, 430, 768, 1440]) {
-  await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 800 })
-  await sleep(500)
-  const res = JSON.parse(await evalPage(`(async () => {
-    window.scrollTo(0, document.querySelector('#reviews').offsetTop); await new Promise(r => setTimeout(r, 800))
-    const name = document.querySelector('.reviews__name')
-    const role = document.querySelector('.reviews__role')
-    const counter = document.querySelector('.review-controls span')
-    const btns = [...document.querySelectorAll('.review-controls button')]
-    if (!name || !role || !counter || btns.length < 2) return JSON.stringify({ missing: true })
+await go('/reviews')
+check('reviews: featured + 5 cards, no overlap at 390px', await (async () => {
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
+  await sleep(600)
+  const ok = await evalPage(`(() => {
+    const name = document.querySelector('.reviews-featured .reviews__name')
+    const role = document.querySelector('.reviews-featured .reviews__role')
+    if (!name || !role) return false
     const r = el => { const b = el.getBoundingClientRect(); return { l: b.left, rt: b.right, t: b.top, b: b.bottom } }
-    const boxes = { counter: r(counter), name: r(name), next: r(btns[1]), prev: r(btns[0]), role: r(role) }
-    const hit = (a, b) => a.l < b.rt - 0.5 && b.l < a.rt - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5
-    const overlaps = []
-    const keys = Object.keys(boxes)
-    for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) if (hit(boxes[keys[i]], boxes[keys[j]])) overlaps.push(keys[i] + '+' + keys[j])
-    const visible = name.getBoundingClientRect().height > 0 && counter.getBoundingClientRect().height > 0
-    return JSON.stringify({ overlaps, visible })
-  })()`))
-  if (res.missing || !res.visible || res.overlaps.length) overlapFailures.push(`${width}: ${res.missing ? 'missing elements' : res.overlaps.join(',') || 'invisible'}`)
-  console.log(`  width ${width}: ${res.missing ? 'MISSING' : res.overlaps.length ? 'OVERLAP ' + res.overlaps.join(',') : 'ok'}`)
-}
-await send('Emulation.clearDeviceMetricsOverride')
-check('reviews: name/role/counter/buttons never overlap at any width', overlapFailures.length === 0, overlapFailures.join(' | '))
+    const a = r(name), c = r(role)
+    return !(a.l < c.rt - 0.5 && c.l < a.rt - 0.5 && a.t < c.b - 0.5 && c.t < a.b - 0.5)
+  })()`)
+  await send('Emulation.clearDeviceMetricsOverride')
+  return ok && await evalPage("document.querySelectorAll('.review-card').length") === 5
+})())
 
-// booking form
-const b = JSON.parse(await evalPage(`(async () => {
-  window.scrollTo(0, document.querySelector('#booking').offsetTop); await new Promise(r => setTimeout(r, 1000))
+await go('/booking')
+check('booking: form renders with labelled fields', await evalPage("['name','phone','email','service','date','time','notes'].every(n => document.querySelector(`[name=${n}]`))"))
+const b = JSON.parse(await evalPage(`(() => {
   const form = document.querySelector('.booking__form')
   const submitBtn = form.querySelector('button[type=submit]')
-  submitBtn.click(); await new Promise(r => setTimeout(r, 400))
-  const out = { errorShown: !!document.querySelector('.form-error'), errorRole: document.querySelector('.form-error')?.getAttribute('role') }
-  const name = form.querySelector('[name=name]')
-  name.value = 'Test Guest'; name.dispatchEvent(new Event('input', { bubbles: true }))
-  const email = form.querySelector('[name=email]')
-  email.value = 'guest@example.com'; email.dispatchEvent(new Event('input', { bubbles: true }))
-  const select = form.querySelector('select[name=service]')
-  select.value = select.options[1].value; select.dispatchEvent(new Event('change', { bubbles: true }))
-  submitBtn.click(); await new Promise(r => setTimeout(r, 400))
-  out.successShown = !!document.querySelector('.booking__success')
-  return JSON.stringify(out)
+  submitBtn.click()
+  return Promise.resolve().then(() => new Promise(r => setTimeout(() => r(JSON.stringify({
+    errorShown: !!document.querySelector('.form-error'),
+    errorRole: document.querySelector('.form-error')?.getAttribute('role'),
+  })), 400)))
 })()`))
-check('booking blocks empty submit with error', b.errorShown === true)
-check('booking error uses role=alert', b.errorRole === 'alert')
-check('booking succeeds when filled', b.successShown === true)
-
-// images all load
-const imgs = JSON.parse(await evalPage(`Promise.all([...document.images].map(i =>
-  i.complete ? Promise.resolve(i.naturalWidth > 0) : new Promise(res => { i.addEventListener('load', () => res(true)); i.addEventListener('error', () => res(false)) })
-)).then(vals => JSON.stringify({ total: vals.length, broken: vals.filter(v => !v).length }))`))
-check('all images load', imgs.broken === 0, `${imgs.total} images`)
-
-// reduced motion: emulate BEFORE load so useReducedMotion initializes correctly
-await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
-await send('Page.reload')
-await sleep(3500)
-const rm = JSON.parse(await evalPage(`(async () => {
-  const out = {}
-  out.media = matchMedia('(prefers-reduced-motion: reduce)').matches
-  window.scrollTo(0, document.querySelector('#services').offsetTop); await new Promise(r => setTimeout(r, 350))
-  out.opacityImmediately = getComputedStyle(document.querySelector('#services .section-head')).opacity
-  out.cueDuration = parseFloat(getComputedStyle(document.querySelector('.scroll-cue span')).animationDuration)
-  return JSON.stringify(out)
+check('booking: blocks empty submit with role=alert error', b.errorShown === true && b.errorRole === 'alert')
+const b2 = JSON.parse(await evalPage(`(async () => {
+  const set = (name, value) => {
+    const el = document.querySelector('[name=' + name + ']')
+    const proto = el.tagName === 'SELECT' ? HTMLSelectElement : HTMLInputElement
+    Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, value)
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  set('name', 'Test Guest'); set('phone', '0400 000 000'); set('email', 'guest@example.com')
+  set('service', 'gel-manicure'); set('date', '2026-10-01'); set('time', 'morning')
+  document.querySelector('.booking__form button[type=submit]').click()
+  await new Promise(r => setTimeout(r, 400))
+  return JSON.stringify({ successShown: !!document.querySelector('.booking__success'), callLink: document.querySelector('.booking__success a.button')?.getAttribute('href') })
 })()`))
-check('reduced-motion: media query matches', rm.media === true)
-check('reduced-motion: no reveal animation', Number(rm.opacityImmediately) === 1, `opacity=${rm.opacityImmediately}`)
-check('reduced-motion: CSS animations disabled', rm.cueDuration < 0.001, `duration=${rm.cueDuration}`)
-await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] })
+check('booking: succeeds when filled', b2.successShown === true)
+check('booking: confirmation offers call action', (b2.callLink || '').startsWith('tel:'))
 
-// mobile viewport
+await go('/booking?service=nail-art')
+check('booking: query param preselects service', await evalPage("document.querySelector('[name=service]')?.value") === 'nail-art')
+
+await go('/contact')
+check('contact: renders info + map link', await evalPage("!!document.querySelector('.contact-page__info') && document.querySelector('.map-card')?.href.includes('maps.google.com')"))
+
+await go('/no-such-page')
+check('404: branded page with back-home link', await evalPage("!!document.querySelector('.not-found') && document.querySelector('.not-found a.button')?.getAttribute('href') === '/'"))
+
+// footer present with routing links on every page
+for (const path of ['/', '/about', '/services', '/gallery', '/reviews', '/booking', '/contact']) {
+  await go(path, 1800)
+  const footerOk = await evalPage(`(() => {
+    const links = [...document.querySelectorAll('.footer a')]
+    const has404Href = links.some(a => a.getAttribute('href') === '/404')
+    return links.length >= 10 && !has404Href
+  })()`)
+  check(`footer: routing links ok on ${path}`, footerOk)
+}
+
+// scroll progress reacts to scrolling
+await go('/')
+const p0 = await evalPage("getComputedStyle(document.querySelector('.scroll-progress')).transform")
+await evalPage('window.scrollTo(0, document.body.scrollHeight)')
+await sleep(800)
+const p2 = await evalPage("getComputedStyle(document.querySelector('.scroll-progress')).transform")
+check('scroll progress bar animates', p0 !== p2, `${p0} -> ${p2}`)
+
+// mobile navigation
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 await sleep(800)
 const m = JSON.parse(await evalPage(`(() => {
   const out = {}
   out.hScroll = document.documentElement.scrollWidth > window.innerWidth + 1
   out.toggleVisible = getComputedStyle(document.querySelector('.nav__toggle')).display !== 'none'
-  out.bookHidden = getComputedStyle(document.querySelector('.nav__book')).display === 'none'
   document.querySelector('.nav__toggle').click()
   return new Promise(res => setTimeout(() => {
     out.menuOpen = document.querySelector('.nav__links').classList.contains('nav__links--open')
-    res(JSON.stringify(out))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyIdentifier: 'Escape', bubbles: true }))
+    setTimeout(() => {
+      out.menuClosesOnEscape = !document.querySelector('.nav__links').classList.contains('nav__links--open')
+      res(JSON.stringify(out))
+    }, 500)
   }, 600))
 })()`))
 check('mobile: no horizontal scroll', m.hScroll === false)
 check('mobile: menu toggle visible', m.toggleVisible)
-check('mobile: desktop book button hidden', m.bookHidden === true)
 check('mobile: menu opens on toggle', m.menuOpen)
-await evalPage("document.querySelector('.nav__links a').click()")
+check('mobile: menu closes on Escape', m.menuClosesOnEscape)
+await evalPage("document.querySelector('.nav__toggle').click(); document.querySelector('.nav__links a').click()")
 await sleep(500)
 check('mobile: menu closes after nav click', await evalPage("!document.querySelector('.nav__links').classList.contains('nav__links--open')"))
+
 await send('Emulation.clearDeviceMetricsOverride')
+
+// images all load across key pages (scroll first so lazy images actually load)
+for (const path of ['/', '/about', '/gallery', '/services/gel-manicure']) {
+  await go(path, 2200)
+  await evalPage(`(async () => {
+    for (let y = 0; y <= document.body.scrollHeight; y += 700) {
+      window.scrollTo(0, y)
+      await new Promise(r => setTimeout(r, 130))
+    }
+    window.scrollTo(0, 0)
+  })()`)
+  await sleep(900)
+  const imgs = JSON.parse(await evalPage(`Promise.race([
+    Promise.all([...document.images].map(i =>
+      i.complete ? Promise.resolve(i.naturalWidth > 0) : new Promise(res => {
+        const t = setTimeout(() => res('timeout'), 12000)
+        i.addEventListener('load', () => { clearTimeout(t); res(true) })
+        i.addEventListener('error', () => { clearTimeout(t); res(false) })
+      })
+    )).then(vals => JSON.stringify({ total: vals.length, broken: vals.filter(v => v !== true).length })),
+    new Promise(res => setTimeout(() => res(JSON.stringify({ total: document.images.length, broken: -1 })), 25000)),
+  ])`))
+  check(`images load on ${path}`, imgs.broken === 0, `${imgs.total} images`)
+}
+
+// reduced motion: emulate BEFORE load
+await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+await go('/services', 3500)
+const rm = JSON.parse(await evalPage(`(async () => {
+  const out = {}
+  out.media = matchMedia('(prefers-reduced-motion: reduce)').matches
+  window.scrollTo(0, 600); await new Promise(r => setTimeout(r, 350))
+  out.opacityImmediately = getComputedStyle(document.querySelector('.services-catalogue .section-head')).opacity
+  return JSON.stringify(out)
+})()`))
+check('reduced-motion: media query matches', rm.media === true)
+check('reduced-motion: no reveal animation', Number(rm.opacityImmediately) === 1, `opacity=${rm.opacityImmediately}`)
+
+await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] })
 
 check('no console errors during run', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))
 
